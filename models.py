@@ -79,7 +79,7 @@ class User:
                 count = count + 1
         return count
 
-    class CutProfile(User):
+class CutProfile(User):
     """Barnklass som lägger till mål ovanpå User."""
 
     def __init__(self, name, height_cm, age, sex, start_weight, goal_weight,
