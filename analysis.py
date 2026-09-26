@@ -1,7 +1,8 @@
 import json
+import csv
 import os
 
-from models import CutProfile
+from models import CutProfile, DailyLog
 
 
 def make_filename(name, suffix):
@@ -71,3 +72,52 @@ def load_profile(name):
     except KeyError as e:
         print(f"Ett fält saknas i filen: {e}")
         return None
+
+def export_logs_csv(profile):
+    """Sparar loggarna som CSV. Det här är datafilen som lämnas in vid examinationen."""
+    filename = make_filename(profile.name, "logs.csv")
+
+    if os.path.exists(filename):
+        print(f"{filename} finns redan, skriver över.")
+    else:
+        print(f"Skapar ny fil: {filename}")
+
+    try:
+        with open(filename, "w", newline="", encoding="utf-8") as file:
+            writer = csv.writer(file)
+            writer.writerow(["date", "weight", "calories", "protein", "steps", "trained"])
+            for log in profile.logs:
+                writer.writerow([log.date, log.weight, log.calories, log.protein, log.steps, log.trained])
+        print(f"Sparade {len(profile.logs)} loggar i {filename}")
+    except OSError as e:
+        print(f"Kunde inte spara loggarna: {e}")
+
+
+def import_logs_csv(profile, filename):
+    """
+    Läser in loggar från en valfri CSV-fil. Skiljer sig från export_logs_csv
+    genom att filnamnet kommer utifrån, inte från profilens namn.
+    """
+    imported = 0
+    skipped = 0
+    try:
+        with open(filename, "r", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                try:
+                    log = DailyLog(
+                        row["date"],
+                        float(row["weight"]),
+                        float(row["calories"]),
+                        float(row["protein"]),
+                        int(row["steps"]),
+                        row["trained"] == "True"
+                    )
+                    profile.add_log(log)
+                    imported = imported + 1
+                except (ValueError, KeyError):
+                    skipped = skipped + 1
+
+        print(f"Importerade {imported} loggar, hoppade över {skipped} felaktiga rader.")
+    except FileNotFoundError:
+        print(f"Hittade ingen fil: {filename}")
