@@ -1,7 +1,7 @@
 import json
 import csv
 import os
-
+import matplotlib.pyplot as plt
 from models import CutProfile, DailyLog
 
 
@@ -121,3 +121,26 @@ def import_logs_csv(profile, filename):
         print(f"Importerade {imported} loggar, hoppade över {skipped} felaktiga rader.")
     except FileNotFoundError:
         print(f"Hittade ingen fil: {filename}")
+  
+def plot_weight(profile):
+    """Ritar och sparar ett viktdiagram med målvikten inritad som en streckad linje."""
+    filename = make_filename(profile.name, "weight_chart.png")
+
+    dates = []
+    weights = []
+    for log in profile.logs:
+        dates.append(log.date)
+        weights.append(log.weight)
+
+    plt.figure(figsize=(8, 4))
+    plt.plot(dates, weights, marker="o", label="Vikt")
+    plt.axhline(y=profile.goal_weight, linestyle="--", color="gray", label="Målvikt")
+    plt.title(f"Viktutveckling för {profile.name}")
+    plt.xlabel("Datum")
+    plt.ylabel("Vikt (kg)")
+    plt.xticks(rotation=45)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(filename)
+    plt.show()
+    print(f"Diagrammet sparat som {filename}")
