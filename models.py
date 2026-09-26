@@ -93,3 +93,44 @@ class CutProfile(User):
         self.protein_goal_per_kg = protein_goal_per_kg
         self.step_goal = step_goal
         self.training_goal_days = training_goal_days
+
+    def protein_goal(self):
+        return round(self.protein_goal_per_kg * self.goal_weight, 1)
+
+    def check_goals(self, days=7):
+        messages = []
+
+        change = self.weight_change(days)
+        if change is None:
+            messages.append("Inte tillräckligt med loggar för att bedöma vikttrenden.")
+        elif change < 0:
+            messages.append(f"Vikten har gått ner {abs(change)} kg de senaste {days} loggarna. Rätt riktning.")
+        elif change == 0:
+            messages.append("Vikten står still. Se över kaloriintaget om målet är nedgång.")
+        else:
+            messages.append(f"Vikten har gått upp {change} kg de senaste {days} loggarna.")
+
+        avg_protein = self.average_protein(days)
+        goal_protein = self.protein_goal()
+        if avg_protein is None:
+            messages.append("Inga loggar för protein än.")
+        elif avg_protein >= goal_protein:
+            messages.append(f"Proteinmålet nås: snitt {avg_protein} g mot mål {goal_protein} g.")
+        else:
+            messages.append(f"Proteinmålet nås inte: snitt {avg_protein} g mot mål {goal_protein} g.")
+
+        avg_steps = self.average_steps(days)
+        if avg_steps is None:
+            messages.append("Inga loggar för steg än.")
+        elif avg_steps >= self.step_goal:
+            messages.append(f"Stegmålet nås: snitt {avg_steps} steg mot mål {self.step_goal}.")
+        else:
+            messages.append(f"Stegmålet nås inte: snitt {avg_steps} steg mot mål {self.step_goal}.")
+
+        days_trained = self.training_days(days)
+        if days_trained >= self.training_goal_days:
+            messages.append(f"Träningsmålet nås: {days_trained} pass mot mål {self.training_goal_days}.")
+        else:
+            messages.append(f"Träningsmålet nås inte: {days_trained} pass mot mål {self.training_goal_days}.")
+
+        return messages
