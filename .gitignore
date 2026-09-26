@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
+
+*_profile.json
+*_logs.csv
+*_weight_chart.png
+!testperson_profile.json
+!testperson_logs.csv
+!testperson_weight_chart.png
