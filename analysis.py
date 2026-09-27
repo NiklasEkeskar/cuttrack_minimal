@@ -1,174 +1,172 @@
-from datetime import datetime
+import json
+import csv
+import os
+import matplotlib.pyplot as plt
+
+from models import CutProfile, DailyLog
 
 
-class DailyLog:
-    """En daglig logg med vikt, kalorier, protein, steg och träning."""
+def make_filename(name, suffix):
+    """
+    Bygger ett säkert filnamn från ett användarnamn. Användarens text
+    går aldrig rakt in i ett filnamn, bara de tecken som är bokstäver
+    eller siffror plockas ut, teckenvis i en loop.
+    """
+    # isalnum() är True för bokstäver och siffror, False för mellanslag,
+    # bindestreck, snedstreck och liknande. Skriver användaren till
+    # exempel "../hemligt" plockas bara "hemligt" ut, ingen del av
+    # sökvägen kan smyga sig med.
+    safe_chars = ""
+    for char in name:
+        if char.isalnum():
+            safe_chars = safe_chars + char.lower()
 
-    def __init__(self, date, weight, calories, protein, steps, trained):
-        # Validering sker här, i __init__, så att ett orimligt värde stoppas
-        # så tidigt som möjligt, innan det hinner spridas vidare till någon
-        # beräkning. Den som skapar en DailyLog (import_logs_csv, log_today)
-        # fångar felet med try/except.
-        if weight <= 0 or weight > 400:
-            raise ValueError(f"Orimligt vikt-värde: {weight}")
-        if calories < 0 or calories > 10000:
-            raise ValueError(f"Orimligt kalori-värde: {calories}")
+    if safe_chars == "":
+        safe_chars = "user"
 
-        self.date = date
-        self.weight = weight
-        self.calories = calories
-        self.protein = protein
-        self.steps = steps
-        self.trained = trained
-
-
-class User:
-    """Bas-klass för en användare som loggar sin data."""
-
-    def __init__(self, name, height_cm, age, sex, start_weight):
-        self.name = name
-        self.height_cm = height_cm
-        self.age = age
-        self.sex = sex
-        self.start_weight = start_weight
-        self.created_date = datetime.now().strftime("%Y-%m-%d")
-        self.logs = []
-
-    def add_log(self, log):
-        self.logs.append(log)
-
-    def get_logs(self, days):
-        """Ger de senaste 'days' loggade posterna (inte kalenderdagar)."""
-        # logs[-days:] plockar de sista "days" elementen i listan, oavsett
-        # vilka datum de faktiskt har. Om användaren missat att logga en dag
-        # räknas alltså inte det som ett hål, listan glider bara ett steg
-        # längre bak i tiden. En kalenderbaserad version hade behövt jämföra
-        # riktiga datumobjekt istället, mer kod för samma sak.
-        if days >= len(self.logs):
-            return self.logs
-        return self.logs[-days:]
-
-    def average_weight(self, days):
-        # Alla average_-metoder följer samma mönster: hämta rätt loggar,
-        # kolla att listan inte är tom (annars division med noll), summera
-        # för hand i en loop, dela på antalet. Ingen statistics.mean(),
-        # för att hela uträkningen ska synas i klartext.
-        logs = self.get_logs(days)
-        if len(logs) == 0:
-            return None
-        total = 0
-        for log in logs:
-            total = total + log.weight
-        return round(total / len(logs), 1)
-
-    def average_protein(self, days):
-        logs = self.get_logs(days)
-        if len(logs) == 0:
-            return None
-        total = 0
-        for log in logs:
-            total = total + log.protein
-        return round(total / len(logs), 1)
-
-    def average_steps(self, days):
-        logs = self.get_logs(days)
-        if len(logs) == 0:
-            return None
-        total = 0
-        for log in logs:
-            total = total + log.steps
-        return round(total / len(logs))
-
-    def weight_change(self, days):
-        # Kräver minst två loggar, annars finns det inget att jämföra mot,
-        # en enda vikt kan inte visa en förändring. logs[-1] är senaste
-        # loggen, logs[0] är den äldsta inom fönstret.
-        logs = self.get_logs(days)
-        if len(logs) < 2:
-            return None
-        return round(logs[-1].weight - logs[0].weight, 1)
-
-    def training_days(self, days):
-        # Skillnad mot metoderna ovan: här returneras 0, inte None, när
-        # listan är tom. Noll träningspass är ett giltigt, korrekt svar,
-        # till skillnad från ett medelvärde som inte går att räkna ut alls
-        # utan data.
-        logs = self.get_logs(days)
-        count = 0
-        for log in logs:
-            if log.trained:
-                count = count + 1
-        return count
+    return f"{safe_chars}_{suffix}"
 
 
-class CutProfile(User):
-    """Barnklass som lägger till mål ovanpå User."""
+def save_profile(profile):
+    """Sparar profilen som JSON. Filnamnet byggs från profilens namn."""
+    filename = make_filename(profile.name, "profile.json")
 
-    def __init__(self, name, height_cm, age, sex, start_weight, goal_weight,
-                 protein_goal_per_kg=1.9, step_goal=8000, training_goal_days=3):
-        # super().__init__() måste anropas innan CutProfile sätter sina egna
-        # attribut. Det är den raden som faktiskt sätter self.name,
-        # self.logs och så vidare, class CutProfile(User) i sig ger bara
-        # tillgång till Users metoder, inte till att attributen redan finns.
-        super().__init__(name, height_cm, age, sex, start_weight)
+    # Bygger dict:en manuellt, fält för fält, istället för profile.__dict__.
+    # Det gör att logs (listan med DailyLog-objekt) aldrig hamnar i den här
+    # filen av misstag, listan sparas separat via export_logs_csv, och det
+    # gör exakt vilka fält som sparas synligt i klartext.
+    data = {
+        "name": profile.name,
+        "height_cm": profile.height_cm,
+        "age": profile.age,
+        "sex": profile.sex,
+        "start_weight": profile.start_weight,
+        "goal_weight": profile.goal_weight,
+        "protein_goal_per_kg": profile.protein_goal_per_kg,
+        "step_goal": profile.step_goal,
+        "training_goal_days": profile.training_goal_days,
+        "created_date": profile.created_date,
+    }
 
-        if goal_weight >= start_weight:
-            raise ValueError("Målvikten måste vara lägre än startvikten.")
+    try:
+        with open(filename, "w", encoding="utf-8") as file:
+            json.dump(data, file, indent=2, ensure_ascii=False)
+        print(f"Profilen sparad i {filename}")
+    except OSError as e:
+        print(f"Kunde inte spara profilen: {e}")
 
-        self.goal_weight = goal_weight
-        self.protein_goal_per_kg = protein_goal_per_kg
-        self.step_goal = step_goal
-        self.training_goal_days = training_goal_days
 
-    def protein_goal(self):
-        # Räknas mot goal_weight (målvikten), inte mot aktuell vikt, så att
-        # målet ligger stilla genom hela deffen. Räknade vi mot aktuell vikt
-        # skulle proteinmålet sjunka i takt med kroppsvikten, fel riktning
-        # när syftet är att bevara muskelmassa.
-        return round(self.protein_goal_per_kg * self.goal_weight, 1)
+def load_profile(name):
+    """Läser in en profil baserat på namn. Filnamnet byggs på samma sätt som i save_profile."""
+    filename = make_filename(name, "profile.json")
 
-    def check_goals(self, days=7):
-        """Regelbaserade råd. Jämför snitt mot mål, ingen fysiologisk beräkning."""
-        # Fyra oberoende kontroller, ingen inbördes prioritering. Var och en
-        # bygger en textrad och lägger den i messages, som returneras som
-        # en lista sist i metoden.
-        messages = []
+    try:
+        with open(filename, "r", encoding="utf-8") as file:
+            data = json.load(file)
 
-        # 1. Vikttrend: bara riktningen (upp/ner/still) räknas, ingen procent.
-        change = self.weight_change(days)
-        if change is None:
-            messages.append("Inte tillräckligt med loggar för att bedöma vikttrenden.")
-        elif change < 0:
-            messages.append(f"Vikten har gått ner {abs(change)} kg de senaste {days} loggarna. Rätt riktning.")
-        elif change == 0:
-            messages.append("Vikten står still. Se över kaloriintaget om målet är nedgång.")
-        else:
-            messages.append(f"Vikten har gått upp {change} kg de senaste {days} loggarna.")
+        profile = CutProfile(
+            data["name"], data["height_cm"], data["age"], data["sex"],
+            data["start_weight"], data["goal_weight"],
+            data["protein_goal_per_kg"], data["step_goal"], data["training_goal_days"]
+        )
+        print(f"Profilen {profile.name} inläst från {filename}")
+        return profile
 
-        # 2. Protein: snitt mot protein_goal(), som är räknat mot målvikten.
-        avg_protein = self.average_protein(days)
-        goal_protein = self.protein_goal()
-        if avg_protein is None:
-            messages.append("Inga loggar för protein än.")
-        elif avg_protein >= goal_protein:
-            messages.append(f"Proteinmålet nås: snitt {avg_protein} g mot mål {goal_protein} g.")
-        else:
-            messages.append(f"Proteinmålet nås inte: snitt {avg_protein} g mot mål {goal_protein} g.")
+    # Tre skilda except-block istället för ett generellt except Exception,
+    # så att felmeddelandet till användaren kan vara specifikt om vad som
+    # faktiskt gick fel:
+    except FileNotFoundError:
+        # Filen finns inte alls, t.ex. första gången ett namn används.
+        print(f"Hittade ingen fil: {filename}")
+        return None
+    except json.JSONDecodeError:
+        # Filen finns men innehållet är trasig JSON, t.ex. avbruten skrivning.
+        print(f"Filen {filename} innehåller inte giltig JSON.")
+        return None
+    except KeyError as e:
+        # Filen är giltig JSON men saknar ett fält CutProfile behöver.
+        print(f"Ett fält saknas i filen: {e}")
+        return None
 
-        # 3. Steg: snitt mot ett fast stegmål.
-        avg_steps = self.average_steps(days)
-        if avg_steps is None:
-            messages.append("Inga loggar för steg än.")
-        elif avg_steps >= self.step_goal:
-            messages.append(f"Stegmålet nås: snitt {avg_steps} steg mot mål {self.step_goal}.")
-        else:
-            messages.append(f"Stegmålet nås inte: snitt {avg_steps} steg mot mål {self.step_goal}.")
 
-        # 4. Träning: antal loggade pass mot ett fast mål, ingen procent.
-        days_trained = self.training_days(days)
-        if days_trained >= self.training_goal_days:
-            messages.append(f"Träningsmålet nås: {days_trained} pass mot mål {self.training_goal_days}.")
-        else:
-            messages.append(f"Träningsmålet nås inte: {days_trained} pass mot mål {self.training_goal_days}.")
+def export_logs_csv(profile):
+    """Sparar loggarna som CSV. Det här är datafilen som lämnas in vid examinationen."""
+    filename = make_filename(profile.name, "logs.csv")
 
-        return messages
+    # Bara en informativ utskrift till användaren, ingen funktionell
+    # skillnad i vad som händer, open(..., "w") skriver över filen oavsett.
+    if os.path.exists(filename):
+        print(f"{filename} finns redan, skriver över.")
+    else:
+        print(f"Skapar ny fil: {filename}")
+
+    try:
+        with open(filename, "w", newline="", encoding="utf-8") as file:
+            writer = csv.writer(file)
+            writer.writerow(["date", "weight", "calories", "protein", "steps", "trained"])
+            for log in profile.logs:
+                writer.writerow([log.date, log.weight, log.calories, log.protein, log.steps, log.trained])
+        print(f"Sparade {len(profile.logs)} loggar i {filename}")
+    except OSError as e:
+        print(f"Kunde inte spara loggarna: {e}")
+
+
+def import_logs_csv(profile, filename):
+    """
+    Läser in loggar från en valfri CSV-fil. Skiljer sig från export_logs_csv
+    genom att filnamnet kommer utifrån, inte från profilens namn.
+    """
+    imported = 0
+    skipped = 0
+    try:
+        with open(filename, "r", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                # try/except ligger inuti loopen, inte runt hela den. Det
+                # betyder att EN trasig rad hoppas över (räknas i skipped)
+                # utan att resten av filen struntas i. Ligger try/except
+                # utanför loopen istället stoppar en enda dålig rad
+                # importen helt.
+                try:
+                    log = DailyLog(
+                        row["date"],
+                        float(row["weight"]),
+                        float(row["calories"]),
+                        float(row["protein"]),
+                        int(row["steps"]),
+                        row["trained"] == "True"
+                    )
+                    profile.add_log(log)
+                    imported = imported + 1
+                except (ValueError, KeyError):
+                    skipped = skipped + 1
+
+        print(f"Importerade {imported} loggar, hoppade över {skipped} felaktiga rader.")
+    except FileNotFoundError:
+        print(f"Hittade ingen fil: {filename}")
+
+
+def plot_weight(profile):
+    """Ritar och sparar ett viktdiagram med målvikten inritad som en streckad linje."""
+    filename = make_filename(profile.name, "weight_chart.png")
+
+    dates = []
+    weights = []
+    for log in profile.logs:
+        dates.append(log.date)
+        weights.append(log.weight)
+
+    plt.figure(figsize=(8, 4))
+    plt.plot(dates, weights, marker="o", label="Vikt")
+    plt.axhline(y=profile.goal_weight, linestyle="--", color="gray", label="Målvikt")
+    plt.title(f"Viktutveckling för {profile.name}")
+    plt.xlabel("Datum")
+    plt.ylabel("Vikt (kg)")
+    plt.xticks(rotation=45)
+    plt.legend()
+    plt.tight_layout()
+    # savefig körs före show(): filen sparas till disk oavsett om
+    # diagramfönstret sedan stängs utan att sparas manuellt.
+    plt.savefig(filename)
+    plt.show()
+    print(f"Diagrammet sparat som {filename}")
