@@ -1,0 +1,12 @@
+{
+  "name": "Testperson",
+  "height_cm": 180,
+  "age": 32,
+  "sex": "man",
+  "start_weight": 92.0,
+  "goal_weight": 85.0,
+  "protein_goal_per_kg": 1.9,
+  "step_goal": 8000,
+  "training_goal_days": 3,
+  "created_date": "2026-09-27"
+}
