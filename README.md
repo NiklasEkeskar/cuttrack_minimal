@@ -68,13 +68,11 @@ Vid en framtida vidareutveckling skulle stora delar av den befintliga lösningen
 Projektet har därmed gjort kopplingen till AI-utveckling konkret för mig. En modell kan inte ge tillförlitliga bedömningar utan tillräcklig och välstrukturerad data. CutTrack bygger inte en sådan modell, men skapar det dataflöde som en framtida AI-lösning skulle vara beroende av.
 
 ## AI-användning
-Jag har använt Claude (Anthropic) som stöd under arbetet med CutTrack, på följande sätt:
+Jag har använt Claude (Anthropic) som bollplank och studiecoach genom hela projektet. Idén, produktvisionen och de bärande besluten är mina: vad programmet ska logga, vilka råd det ska ge, att skala ner till en enklare version för att hinna leverera något komplett, och att koden ska hållas på en nivå jag kan förklara muntligt.
 
-- Diskussion om vilken omfattning projektet borde ha för att nå VG utan onödig risk, jämfört mot examinationsbeskrivningens faktiska krav
-- Kodförslag för klasserna, filhanteringen och den interaktiva menyn, anpassade till kursens nybörjarnivå på min egen begäran (jag ville inte ha bibliotek eller konstruktioner jag inte kan förklara muntligt)
-- Förklaring av varje del av koden, till exempel varför `super().__init__()` behövs, varför felhantering delas upp per feltyp, och varför användarnamn aldrig går rakt in i ett filnamn
+Jag har byggt upp projektet steg för steg i repot, kört och testat varje del på min egen dator, felsökt det som gick fel och skrivit om förslag som inte stämde med vad jag ville. AI:n har jag använt som understöd under hela processen som vi bearbetat tillsammans. Vi har därefter gått igenom koden funktion för funktion. 
 
-Jag har läst igenom, kört och testat all kod själv, och kan förklara varje del av den samt göra ändringar i den utan hjälp. Ingen personuppgift skickades till AI-verktyget under arbetet, all testdata i projektet är påhittad (`Testperson 1`, `Testperson`, `Testperson 3`, slumpmässigt genererade loggar).
+Ingen riktig användardata har skickats till AI-verktyget, all testdata är påhittad.
 
 ## Installation
 1. Se till att `models.py`, `analysis.py` och `cuttrack_minimal.ipynb` ligger i samma mapp
